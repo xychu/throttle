@@ -1,0 +1,26 @@
+package: .
+import:
+- package: github.com/golang/glog
+- package: k8s.io/apimachinery
+  version: kubernetes-1.9.6
+  subpackages:
+  - pkg/api/errors
+  - pkg/apis/meta/v1
+  - pkg/labels
+  - pkg/runtime
+  - pkg/runtime/schema
+  - pkg/runtime/serializer
+  - pkg/watch
+- package: k8s.io/client-go
+  version: kubernetes-1.9.6
+  subpackages:
+  - discovery
+  - discovery/fake
+  - rest
+  - testing
+  - tools/cache
+  - util/flowcontrol
+- package: k8s.io/kubernetes
+  version: release-1.9
+  subpackages:
+  - pkg/apis/core
