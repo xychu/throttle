@@ -23,7 +23,9 @@ import (
 
 // The following identify resource constants for Kubernetes object types
 const (
-	// GPU request, in cores.
+	// Nvidia GPU resource, in devices.
+	ResourceGPU coreapi.ResourceName = "nvidia.com/gpu"
+	// GPU request, in devices.
 	ResourceRequestsGPU coreapi.ResourceName = "requests.gpu"
 	// GPU limit, in cores.
 	ResourceLimitsGPU coreapi.ResourceName = "limits.gpu"
