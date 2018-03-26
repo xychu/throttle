@@ -17,18 +17,18 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	coreapi "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // The following identify resource constants for Kubernetes object types
 const (
 	// Nvidia GPU resource, in devices.
-	ResourceGPU coreapi.ResourceName = "nvidia.com/gpu"
+	ResourceGPU corev1.ResourceName = "nvidia.com/gpu"
 	// GPU request, in devices.
-	ResourceRequestsGPU coreapi.ResourceName = "requests.gpu"
+	ResourceRequestsGPU corev1.ResourceName = "requests.gpu"
 	// GPU limit, in cores.
-	ResourceLimitsGPU coreapi.ResourceName = "limits.gpu"
+	ResourceLimitsGPU corev1.ResourceName = "limits.gpu"
 )
 
 // +genclient
@@ -40,8 +40,8 @@ type GPUQuota struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   coreapi.ResourceQuotaSpec   `json:"spec"`
-	Status coreapi.ResourceQuotaStatus `json:"status"`
+	Spec   corev1.ResourceQuotaSpec   `json:"spec"`
+	Status corev1.ResourceQuotaStatus `json:"status"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
