@@ -21,7 +21,7 @@ package v1alpha1
 import (
 	time "time"
 
-	throttlecontroller_v1alpha1 "github.com/xychu/throttle/pkg/apis//throttlecontroller/v1alpha1"
+	throttlecontroller_v1alpha1 "github.com/xychu/throttle/pkg/apis/throttlecontroller/v1alpha1"
 	versioned "github.com/xychu/throttle/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/xychu/throttle/pkg/client/informers/externalversions/internalinterfaces"
 	v1alpha1 "github.com/xychu/throttle/pkg/client/listers/throttlecontroller/v1alpha1"
