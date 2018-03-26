@@ -21,8 +21,15 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	kubeinformers "k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+
+	clientset "github.com/xychu/throttle/pkg/client/clientset/versioned"
+	informers "github.com/xychu/throttle/pkg/client/informers/externalversions"
+	"github.com/xychu/throttle/pkg/signals"
 )
 
 var (
@@ -33,7 +40,33 @@ var (
 func main() {
 	flag.Parse()
 
-	glog.Info("running controller")
+	// set up signals so we handle the first shutdown signal gracefully
+	stopCh := signals.SetupSignalHandler()
+
+	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
+	if err != nil {
+		glog.Fatalf("Error building kubeconfig: %s", err.Error())
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		glog.Fatalf("Error building kubernetes clientset: %s", err.Error())
+	}
+
+	throttleClient, err := clientset.NewForConfig(cfg)
+	if err != nil {
+		glog.Fatalf("Error building throttle clientset: %s", err.Error())
+	}
+
+	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
+	throttleInformerFactory := informers.NewSharedInformerFactory(throttleClient, time.Second*30)
+
+	controller := NewController(kubeClient, throttleClient, kubeInformerFactory, throttleInformerFactory)
+
+	go kubeInformerFactory.Start(stopCh)
+	go throttleInformerFactory.Start(stopCh)
+
+	glog.Info("running throttle controller")
 }
 
 func init() {
