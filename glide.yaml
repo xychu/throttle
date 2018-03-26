@@ -32,6 +32,7 @@ import:
   - rest
   - testing
   - tools/cache
+  - tools/clientcmd
   - tools/record
   - util/flowcontrol
   - util/workqueue
