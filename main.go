@@ -67,6 +67,10 @@ func main() {
 	go throttleInformerFactory.Start(stopCh)
 
 	glog.Info("running throttle controller")
+
+	if err = controller.Run(2, stopCh); err != nil {
+		glog.Fatalf("Error running controller: %s", err.Error())
+	}
 }
 
 func init() {

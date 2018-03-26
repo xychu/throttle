@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubeinformers "k8s.io/client-go/informers"
@@ -277,10 +276,10 @@ func (c *Controller) syncHandler(key string) error {
 		request_value := resource.Quantity{}
 		limit_value := resource.Quantity{}
 		for j := range pods[i].Spec.Containers {
-			if request, found := pods[i].Spec.Containers[j].Resource.Requests[throttlev1alpha1.ResourceRequestsGPU]; found {
+			if request, found := pods[i].Spec.Containers[j].Resources.Requests[throttlev1alpha1.ResourceRequestsGPU]; found {
 				request_value.Add(request)
 			}
-			if limit, found := pods[i].Spec.Containers[j].Resource.Limits[throttlev1alpha1.ResourceRequestsGPU]; found {
+			if limit, found := pods[i].Spec.Containers[j].Resources.Limits[throttlev1alpha1.ResourceRequestsGPU]; found {
 				limit_value.Add(limit)
 			}
 		}
@@ -288,14 +287,14 @@ func (c *Controller) syncHandler(key string) error {
 		// init container resource is compared against the sum of app containers to determine
 		// the effective usage for both requests and limits.
 		for j := range pods[i].Spec.InitContainers {
-			if request, found := pods[i].Spec.InitContainers[j].Resource.Requests[throttlev1alpha1.ResourceRequestsGPU]; found {
+			if request, found := pods[i].Spec.InitContainers[j].Resources.Requests[throttlev1alpha1.ResourceRequestsGPU]; found {
 				if request_value.Cmp(request) < 0 {
-					request_value = request.Copy()
+					request_value = *(request.Copy())
 				}
 			}
-			if limit, found := pods[i].Spec.InitContainers[j].Resource.Limits[throttlev1alpha1.ResourceRequestsGPU]; found {
+			if limit, found := pods[i].Spec.InitContainers[j].Resources.Limits[throttlev1alpha1.ResourceRequestsGPU]; found {
 				if limit_value.Cmp(limit) < 0 {
-					limit_value = limit.Copy()
+					limit_value = *(limit.Copy())
 				}
 			}
 		}
@@ -306,7 +305,7 @@ func (c *Controller) syncHandler(key string) error {
 	used[throttlev1alpha1.ResourceLimitsGPU] = newLimitUsage
 
 	newStatus := corev1.ResourceQuotaStatus{}
-	newStatus.Hard = gpuQuota.Hard
+	newStatus.Hard = gpuQuota.Status.Hard
 	newStatus.Used = used
 
 	gpuQuotaCopy.Status = newStatus
