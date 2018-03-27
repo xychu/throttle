@@ -1,0 +1,28 @@
+{
+  "CN": "gpuquota-webhook.default.svc",
+  "hosts": [
+      "127.0.0.1",
+      "gpuquota-webhook",
+      "gpuquota-webhook.default",
+      "gpuquota-webhook.default.svc",
+      "gpuquota-webhook.default.svc.cluster",
+      "gpuquota-webhook.default.svc.cluster.local",
+      "gpuquota-webhook.kube-system",
+      "gpuquota-webhook.kube-system.svc",
+      "gpuquota-webhook.kube-system.svc.cluster",
+      "gpuquota-webhook.kube-system.svc.cluster.local"
+  ],
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "C": "CN",
+      "L": "Beijing",
+      "O": "k8s",
+      "OU": "GPUQuota Webhook",
+      "ST": "Beijing"
+    }
+  ]
+}

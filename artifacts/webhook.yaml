@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: gpuquota-webhook
+  name: gpuquota-webhook
+spec:
+  ports:
+    - name: https
+      port: 443
+      protocol: "TCP"
+  selector:
+    app: gpuquota-webhook
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: gpuquota-webhook
+spec:
+  template:
+    metadata:
+      labels:
+        app: gpuquota-webhook
+    spec:
+      containers:
+        - name: gpuquota-webhook
+          image: "k8s-gpuquota-admission-webhook-amd64:v1"
+          #imagePullPolicy: Always
+          args:
+            - "--tls-cert-file=/webhook.local.config/certificates/tls.crt"
+            - "--tls-private-key-file=/webhook.local.config/certificates/tls.key"
+            - "-logtostderr"
+            - "-v=4"
+          volumeMounts:
+            - name: webhook-certs
+              mountPath: /webhook.local.config/certificates
+      volumes:
+        - name: webhook-certs
+          secret:
+            secretName: gpuquota-webhook-secret
