@@ -4,6 +4,7 @@ metadata:
   labels:
     app: gpuquota-webhook
   name: gpuquota-webhook
+  namespace: kube-system
 spec:
   ports:
     - name: https
@@ -16,6 +17,7 @@ apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: gpuquota-webhook
+  namespace: kube-system
 spec:
   template:
     metadata:

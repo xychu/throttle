@@ -1,0 +1,9 @@
+apiVersion: throttlecontroller.example.com/v1alpha1
+kind: GPUQuota
+metadata:
+  name: another-example-gpuquota
+  #namespace: example
+spec:
+  hard:
+    limits.gpu: 4
+    requests.gpu: 2
