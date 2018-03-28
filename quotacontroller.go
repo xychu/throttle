@@ -276,10 +276,11 @@ func (c *Controller) syncHandler(key string) error {
 		request_value := resource.Quantity{}
 		limit_value := resource.Quantity{}
 		for j := range pods[i].Spec.Containers {
-			if request, found := pods[i].Spec.Containers[j].Resources.Requests[throttlev1alpha1.ResourceRequestsGPU]; found {
+			glog.V(4).Infof("calc container resource: '%v'", pods[i].Spec.Containers[j].Resources)
+			if request, found := pods[i].Spec.Containers[j].Resources.Requests[throttlev1alpha1.ResourceGPU]; found {
 				request_value.Add(request)
 			}
-			if limit, found := pods[i].Spec.Containers[j].Resources.Limits[throttlev1alpha1.ResourceRequestsGPU]; found {
+			if limit, found := pods[i].Spec.Containers[j].Resources.Limits[throttlev1alpha1.ResourceGPU]; found {
 				limit_value.Add(limit)
 			}
 		}
@@ -287,12 +288,12 @@ func (c *Controller) syncHandler(key string) error {
 		// init container resource is compared against the sum of app containers to determine
 		// the effective usage for both requests and limits.
 		for j := range pods[i].Spec.InitContainers {
-			if request, found := pods[i].Spec.InitContainers[j].Resources.Requests[throttlev1alpha1.ResourceRequestsGPU]; found {
+			if request, found := pods[i].Spec.InitContainers[j].Resources.Requests[throttlev1alpha1.ResourceGPU]; found {
 				if request_value.Cmp(request) < 0 {
 					request_value = *(request.Copy())
 				}
 			}
-			if limit, found := pods[i].Spec.InitContainers[j].Resources.Limits[throttlev1alpha1.ResourceRequestsGPU]; found {
+			if limit, found := pods[i].Spec.InitContainers[j].Resources.Limits[throttlev1alpha1.ResourceGPU]; found {
 				if limit_value.Cmp(limit) < 0 {
 					limit_value = *(limit.Copy())
 				}
@@ -305,7 +306,7 @@ func (c *Controller) syncHandler(key string) error {
 	used[throttlev1alpha1.ResourceLimitsGPU] = newLimitUsage
 
 	newStatus := corev1.ResourceQuotaStatus{}
-	newStatus.Hard = gpuQuota.Status.Hard
+	newStatus.Hard = gpuQuota.Spec.Hard
 	newStatus.Used = used
 
 	gpuQuotaCopy.Status = newStatus
