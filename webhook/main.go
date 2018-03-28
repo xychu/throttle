@@ -17,7 +17,7 @@ limitations under the License.
 package main
 
 import (
-	"crypto/tls"
+	//	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -28,17 +28,26 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/clientcmd"
 	// TODO: try this library to see if it generates correct json patch
 	// https://github.com/mattbaird/jsonpatch
+
+	throttlev1alpha1 "github.com/xychu/throttle/pkg/apis/throttlecontroller/v1alpha1"
+	clientset "github.com/xychu/throttle/pkg/client/clientset/versioned"
 )
 
 // Config contains the server (the webhook) cert and key.
 type Config struct {
-	CertFile string
-	KeyFile  string
+	CertFile   string
+	KeyFile    string
+	KubeConfig string
+	MasterURL  string
 }
+
+var throttleClient *clientset.Clientset
 
 func (c *Config) addFlags() {
 	flag.StringVar(&c.CertFile, "tls-cert-file", c.CertFile, ""+
@@ -46,6 +55,10 @@ func (c *Config) addFlags() {
 		"after server cert).")
 	flag.StringVar(&c.KeyFile, "tls-private-key-file", c.KeyFile, ""+
 		"File containing the default x509 private key matching --tls-cert-file.")
+	flag.StringVar(&c.KubeConfig, "kubeconfig", "", "Path to a kubeconfig. "+
+		"Only required if out-of-cluster.")
+	flag.StringVar(&c.MasterURL, "master", "", "The address of the Kubernetes API server."+
+		" Overrides any value in kubeconfig. Only required if out-of-cluster.")
 }
 
 func toAdmissionResponse(err error) *v1beta1.AdmissionResponse {
@@ -54,6 +67,36 @@ func toAdmissionResponse(err error) *v1beta1.AdmissionResponse {
 			Message: err.Error(),
 		},
 	}
+}
+
+func calcPodGPUUsage(pod *corev1.Pod) (resource.Quantity, resource.Quantity) {
+	request_value := resource.Quantity{}
+	limit_value := resource.Quantity{}
+	for j := range pod.Spec.Containers {
+		glog.V(4).Infof("calc container resource: '%v'", pod.Spec.Containers[j].Resources)
+		if request, found := pod.Spec.Containers[j].Resources.Requests[throttlev1alpha1.ResourceGPU]; found {
+			request_value.Add(request)
+		}
+		if limit, found := pod.Spec.Containers[j].Resources.Limits[throttlev1alpha1.ResourceGPU]; found {
+			limit_value.Add(limit)
+		}
+	}
+	// InitContainers are run **sequentially** before other containers start, so the highest
+	// init container resource is compared against the sum of app containers to determine
+	// the effective usage for both requests and limits.
+	for j := range pod.Spec.InitContainers {
+		if request, found := pod.Spec.InitContainers[j].Resources.Requests[throttlev1alpha1.ResourceGPU]; found {
+			if request_value.Cmp(request) < 0 {
+				request_value = *(request.Copy())
+			}
+		}
+		if limit, found := pod.Spec.InitContainers[j].Resources.Limits[throttlev1alpha1.ResourceGPU]; found {
+			if limit_value.Cmp(limit) < 0 {
+				limit_value = *(limit.Copy())
+			}
+		}
+	}
+	return request_value, limit_value
 }
 
 // only allow pods to pull images from specific registry.
@@ -66,33 +109,89 @@ func admitPods(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 		return toAdmissionResponse(err)
 	}
 
+	isUpdate := false
+	if &ar.Request.OldObject != nil {
+		isUpdate = true
+	}
 	raw := ar.Request.Object.Raw
+	oldRaw := []byte{}
 	pod := corev1.Pod{}
+	oldPod := corev1.Pod{}
 	deserializer := codecs.UniversalDeserializer()
 	if _, _, err := deserializer.Decode(raw, nil, &pod); err != nil {
 		glog.Error(err)
 		return toAdmissionResponse(err)
 	}
+	if isUpdate {
+		oldRaw = ar.Request.OldObject.Raw
+		if _, _, err := deserializer.Decode(oldRaw, nil, &oldPod); err != nil {
+			glog.Error(err)
+			return toAdmissionResponse(err)
+		}
+	}
 	reviewResponse := v1beta1.AdmissionResponse{}
 	reviewResponse.Allowed = true
 
-	var msg string
-	if v, ok := pod.Labels["webhook-e2e-test"]; ok {
-		if v == "webhook-disallow" {
-			reviewResponse.Allowed = false
-			msg = msg + "the pod contains unwanted label; "
+	requestGPUQuota := resource.Quantity{}
+	requestGPUQuotaUsed := resource.Quantity{}
+	limitGPUQuota := resource.Quantity{}
+	limitGPUQuotaUsed := resource.Quantity{}
+	gpuQuotas, err := throttleClient.ThrottlecontrollerV1alpha1().GPUQuotas(pod.Namespace).List(metav1.ListOptions{})
+	if err != nil {
+		glog.Error(err)
+		return toAdmissionResponse(err)
+	}
+	for i := range gpuQuotas.Items {
+		if request, found := gpuQuotas.Items[i].Spec.Hard[throttlev1alpha1.ResourceRequestsGPU]; found {
+			requestGPUQuota.Add(request)
 		}
-		if v == "wait-forever" {
-			reviewResponse.Allowed = false
-			msg = msg + "the pod response should not be sent; "
-			<-make(chan int) // Sleep forever - no one sends to this channel
+		if request, found := gpuQuotas.Items[i].Status.Used[throttlev1alpha1.ResourceRequestsGPU]; found {
+			requestGPUQuotaUsed.Add(request)
+		}
+		if limit, found := gpuQuotas.Items[i].Spec.Hard[throttlev1alpha1.ResourceLimitsGPU]; found {
+			limitGPUQuota.Add(limit)
+		}
+		if limit, found := gpuQuotas.Items[i].Status.Used[throttlev1alpha1.ResourceLimitsGPU]; found {
+			limitGPUQuotaUsed.Add(limit)
 		}
 	}
-	for _, container := range pod.Spec.Containers {
-		if strings.Contains(container.Name, "webhook-disallow") {
-			reviewResponse.Allowed = false
-			msg = msg + "the pod contains unwanted container name; "
-		}
+	if requestGPUQuota.IsZero() && limitGPUQuota.IsZero() {
+		glog.Infof("no GPU Quota defined for Namespece: %s", pod.Namespace)
+		return &reviewResponse
+	}
+
+	var msg string
+	requestGPU, limitGPU := calcPodGPUUsage(&pod)
+	oldRequestGPU := resource.Quantity{}
+	oldLimitGPU := resource.Quantity{}
+	if isUpdate {
+		oldRequestGPU, oldLimitGPU = calcPodGPUUsage(&oldPod)
+	}
+
+	requestGPU.Sub(oldRequestGPU)
+	limitGPU.Sub(oldLimitGPU)
+
+	requestGPUQuota.Sub(requestGPUQuotaUsed)
+	limitGPUQuota.Sub(limitGPUQuotaUsed)
+	if requestGPUQuota.Cmp(requestGPU) < 0 {
+		requestGPUQuota.Add(requestGPUQuotaUsed)
+		reviewResponse.Allowed = false
+		msg = msg + fmt.Sprintf("exceeded quota: %s, requested(%s) + used(%s) > limited(%s)",
+			throttlev1alpha1.ResourceRequestsGPU,
+			requestGPU.String(),
+			requestGPUQuotaUsed.String(),
+			requestGPUQuota.String(),
+		)
+	}
+	if limitGPUQuota.Cmp(limitGPU) < 0 {
+		limitGPUQuota.Add(limitGPUQuotaUsed)
+		reviewResponse.Allowed = false
+		msg = msg + fmt.Sprintf("exceeded quota: %s, requested(%s) + used(%s) > limited(%s)",
+			throttlev1alpha1.ResourceLimitsGPU,
+			limitGPU.String(),
+			limitGPUQuotaUsed.String(),
+			limitGPUQuota.String(),
+		)
 	}
 	if !reviewResponse.Allowed {
 		reviewResponse.Result = &metav1.Status{Message: strings.TrimSpace(msg)}
@@ -154,15 +253,26 @@ func main() {
 	config.addFlags()
 	flag.Parse()
 
-	http.HandleFunc("/", servePods)
-	//clientset := getClient()
-	server := &http.Server{
-		Addr: ":443",
-		//	TLSConfig: configTLS(config, clientset),
-		TLSConfig: &tls.Config{
-			ClientAuth: tls.NoClientCert,
-		},
+	// init throttle client
+	cfg, err := clientcmd.BuildConfigFromFlags(config.MasterURL, config.KubeConfig)
+	if err != nil {
+		glog.Fatalf("Error building kubeconfig: %s", err.Error())
 	}
-	//server.ListenAndServeTLS("", "")
-	server.ListenAndServeTLS(config.CertFile, config.KeyFile)
+
+	throttleClient, err = clientset.NewForConfig(cfg)
+	if err != nil {
+		glog.Fatalf("Error building throttle clientset: %s", err.Error())
+	}
+
+	http.HandleFunc("/", servePods)
+	clientset := getClient()
+	server := &http.Server{
+		Addr:      ":443",
+		TLSConfig: configTLS(config, clientset),
+		//TLSConfig: &tls.Config{
+		//	ClientAuth: tls.NoClientCert,
+		//},
+	}
+	server.ListenAndServeTLS("", "")
+	//server.ListenAndServeTLS(config.CertFile, config.KeyFile)
 }
