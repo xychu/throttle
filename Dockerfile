@@ -12,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE = xychu/throttle-admission-webhook
-TAG = v1
+FROM alpine:latest
 
-build:
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o webhook .
-	docker build --no-cache -t $(IMAGE):$(TAG) .
-	rm -rf webhook
+ADD throttle /throttle
+ENTRYPOINT ["/throttle"]
