@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
         - name: gpuquota-webhook
-          image: "k8s-gpuquota-admission-webhook-amd64:v1"
+          image: "xychu/throttle-admission-webhook:v1"
           #imagePullPolicy: Always
           args:
             - "--tls-cert-file=/webhook.local.config/certificates/tls.crt"

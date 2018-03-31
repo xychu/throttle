@@ -1,23 +1,8 @@
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: RoleBinding
-metadata:
-  name: gpuquota-webhook-rbac
-subjects:
-  - kind: ServiceAccount
-    name: default
-    namespace: kube-system
-  - kind: ServiceAccount
-    name: default
-    namespace: default
-roleRef:
-  kind: Role
-  name: extension-apiserver-authentication-reader
-  apiGroup: ""
----
+# TODO(xychu): will use specific rules later
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
 metadata:
-  name: webhook-rbac
+  name: throttle-rbac
 subjects:
   - kind: ServiceAccount
     # Reference to upper's `metadata.name`
