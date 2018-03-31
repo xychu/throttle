@@ -2,6 +2,8 @@
 
 Extended resource quota controller and Admission Webhook for using GPU in kubernetes 1.9+.
 
+![throttle arch](/artifacts/img/throttle.png)
+
 ## Usage
 
 ### Prerequisites
