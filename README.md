@@ -1,3 +1,50 @@
+# WARN
+
+Will be obsolet after your kubernetes has: https://github.com/kubernetes/kubernetes/pull/57302
+
+Then the usage will be as simple as: https://github.com/kubernetes/kubernetes/pull/57302#issuecomment-367933408
+
+quota example:
+
+```yaml
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: quota1
+spec:
+  hard:
+    cpu: 300m
+    memory: 3900Mi
+    requests.nvidia.com/gpu: 4
+```
+
+pod example:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+  labels:
+    name: test-pod-applied
+spec:
+  containers:
+  - name: kubernetes-pause
+    image: gcr.io/google-containers/pause:2.0
+    resources:
+      requests:
+        cpu: 300m
+        memory: 1300Mi
+        nvidia.com/gpu: "4"
+      limits:
+        cpu: 300m
+        memory: 1300Mi
+        nvidia.com/gpu: "4"
+```
+
+Kubernetes rocks!
+
+
 # Throttle
 
 Extended resource quota controller and Admission Webhook for using GPU in kubernetes 1.9+.
