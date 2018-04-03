@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	//	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -269,10 +268,6 @@ func main() {
 	server := &http.Server{
 		Addr:      ":443",
 		TLSConfig: configTLS(config, clientset),
-		//TLSConfig: &tls.Config{
-		//	ClientAuth: tls.NoClientCert,
-		//},
 	}
 	server.ListenAndServeTLS("", "")
-	//server.ListenAndServeTLS(config.CertFile, config.KeyFile)
 }
